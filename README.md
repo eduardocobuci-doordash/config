@@ -7,13 +7,13 @@ A modular shell configuration system with Git aliases and customizable environme
 Install with a single command (similar to Homebrew):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/educobuci/config/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/eduardocobuci-doordash/config/main/install.sh | bash
 ```
 
 Or download and inspect the script first:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/educobuci/config/main/install.sh -o install.sh
+curl -fsSL https://raw.githubusercontent.com/eduardocobuci-doordash/config/main/install.sh -o install.sh
 chmod +x install.sh
 ./install.sh
 ```
