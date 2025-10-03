@@ -2,50 +2,10 @@
 
 set -e
 
-# Default configuration
-DEFAULT_REPO="eduardocobuci-doordash/config"
-DEFAULT_BRANCH="main"
-
-# Parse command line arguments
-REPO="${DEFAULT_REPO}"
-BRANCH="${DEFAULT_BRANCH}"
-
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        --repo)
-            REPO="$2"
-            shift 2
-            ;;
-        --branch)
-            BRANCH="$2"
-            shift 2
-            ;;
-        --help|-h)
-            echo "Usage: $0 [OPTIONS]"
-            echo ""
-            echo "Options:"
-            echo "  --repo OWNER/REPO    GitHub repository (default: ${DEFAULT_REPO})"
-            echo "  --branch BRANCH      Git branch (default: ${DEFAULT_BRANCH})"
-            echo "  --help, -h           Show this help message"
-            echo ""
-            echo "Examples:"
-            echo "  $0"
-            echo "  $0 --repo myuser/my-config"
-            echo "  $0 --repo myuser/my-config --branch develop"
-            exit 0
-            ;;
-        *)
-            echo "ERROR: Unknown option: $1" >&2
-            echo "Use --help for usage information"
-            exit 1
-            ;;
-    esac
-done
-
-# Configuration
-REPO_URL="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
+# Get the directory where the script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SOURCE_DIR="${SCRIPT_DIR}/shell"
 CONFIG_DIR="${HOME}/.config/shell"
-BACKUP_DIR="${HOME}/.config/shell.backup.$(date +%Y%m%d_%H%M%S)"
 
 # Colors for output
 RED='\033[0;31m'
@@ -76,81 +36,86 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
-# Download file from GitHub
-download_file() {
-    local url="$1"
-    local dest="$2"
-    
-    if command_exists curl; then
-        curl -fsSL "$url" -o "$dest"
-    elif command_exists wget; then
-        wget -q "$url" -O "$dest"
-    else
-        log_error "Neither curl nor wget is available. Please install one of them."
-        exit 1
-    fi
+# Show help message
+show_help() {
+    echo "Usage: $0 [OPTIONS]"
+    echo ""
+    echo "Install shell configuration files."
+    echo ""
+    echo "Options:"
+    echo "  --help, -h    Show this help message"
+    echo ""
+    echo "Example:"
+    echo "  $0"
 }
 
-# Create backup if config directory exists and remove old config
-backup_existing_config() {
-    if [[ -d "$CONFIG_DIR" ]]; then
-        log_warning "Existing configuration found at $CONFIG_DIR"
-        log_info "Creating backup at $BACKUP_DIR"
-        mkdir -p "$(dirname "$BACKUP_DIR")"
-        cp -r "$CONFIG_DIR" "$BACKUP_DIR"
-        log_success "Backup created successfully"
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --help|-h)
+            show_help
+            exit 0
+            ;;
+        *)
+            echo "ERROR: Unknown option: $1" >&2
+            echo "Use --help for usage information"
+            exit 1
+            ;;
+    esac
+done
+
+# Update repository if running from a git repo
+update_repository() {
+    if [[ -d "$SCRIPT_DIR/.git" ]]; then
+        log_info "Detected git repository, checking for updates..."
         
-        log_info "Removing old configuration directory for clean install..."
-        rm -rf "$CONFIG_DIR"
-        log_success "Old configuration removed"
+        # Check if there are uncommitted changes
+        if ! git -C "$SCRIPT_DIR" diff-index --quiet HEAD -- 2>/dev/null; then
+            log_warning "Local changes detected in repository, skipping auto-update"
+            log_info "Run 'git pull' manually if you want to update"
+            return
+        fi
+        
+        # Try to pull latest changes
+        if git -C "$SCRIPT_DIR" pull --quiet 2>/dev/null; then
+            log_success "Repository updated to latest version"
+        else
+            log_warning "Could not update repository (already up to date or no internet)"
+        fi
     fi
-}
-
-# Get list of conf files from GitHub
-get_conf_files() {
-    local api_url="https://api.github.com/repos/${REPO}/contents/shell?ref=${BRANCH}"
-    local response
-    
-    if command_exists curl; then
-        response=$(curl -fsSL "$api_url" 2>/dev/null)
-    elif command_exists wget; then
-        response=$(wget -qO- "$api_url" 2>/dev/null)
-    else
-        log_error "Neither curl nor wget is available."
-        exit 1
-    fi
-    
-    # Extract .conf filenames from JSON response
-    # This works with both bash and zsh
-    echo "$response" | grep -o '"name": *"[^"]*\.conf"' | sed 's/"name": *"\([^"]*\)"/\1/'
 }
 
 # Install configuration files
 install_configs() {
-    log_info "Creating configuration directory: $CONFIG_DIR"
-    mkdir -p "$CONFIG_DIR"
-    
-    log_info "Fetching list of configuration files from GitHub..."
-    local conf_files
-    conf_files=$(get_conf_files)
-    
-    if [[ -z "$conf_files" ]]; then
-        log_error "No configuration files found or failed to fetch file list"
+    # Check if source directory exists
+    if [[ ! -d "$SOURCE_DIR" ]]; then
+        log_error "Source directory not found: $SOURCE_DIR"
+        log_error "Please run this script from the repository root directory"
         exit 1
     fi
     
-    log_info "Downloading configuration files..."
-    while IFS= read -r filename; do
-        [[ -z "$filename" ]] && continue
-        
+    # Find all .conf files in the shell directory
+    local conf_files
+    conf_files=$(find "$SOURCE_DIR" -name "*.conf" -type f)
+    
+    if [[ -z "$conf_files" ]]; then
+        log_error "No .conf files found in $SOURCE_DIR"
+        exit 1
+    fi
+    
+    log_info "Creating configuration directory: $CONFIG_DIR"
+    mkdir -p "$CONFIG_DIR"
+    
+    log_info "Installing configuration files..."
+    while IFS= read -r file; do
+        local filename=$(basename "$file")
         local dest="$CONFIG_DIR/$filename"
-        local url="$REPO_URL/shell/$filename"
         
-        log_info "Downloading $filename..."
-        if download_file "$url" "$dest"; then
-            log_success "Downloaded $filename"
+        log_info "Installing $filename..."
+        if cp "$file" "$dest"; then
+            log_success "Installed $filename"
         else
-            log_error "Failed to download $filename"
+            log_error "Failed to install $filename"
             exit 1
         fi
     done <<< "$conf_files"
@@ -178,7 +143,7 @@ setup_shell_integration() {
     esac
     
     # Check if already sourced
-    if [[ -f "$shell_rc" ]] && grep -q "\.config/shell/root\.conf" "$shell_rc"; then
+    if [[ -f "$shell_rc" ]] && grep -q "\.config/shell/root\.conf" "$shell_rc" 2>/dev/null; then
         log_info "Configuration already sourced in $shell_rc"
         return
     fi
@@ -197,7 +162,7 @@ compile_zsh_configs() {
         log_info "Compiling zsh configuration files for better performance..."
         zsh -c "
             autoload -Uz zrecompile
-            for f in ~/.config/shell/*.conf ~/.config/shell/**/*.conf; do
+            for f in \"${CONFIG_DIR}\"/*.conf \"${CONFIG_DIR}\"/**/*.conf; do
                 [[ -r \"\$f\" ]] || continue
                 [[ \"\$f.zwc\" -nt \"\$f\" ]] || zrecompile -pq \"\$f\"
             done
@@ -211,8 +176,8 @@ main() {
     log_info "Installing Eduardo's shell configuration..."
     echo
     
-    # Create backup of existing config
-    backup_existing_config
+    # Update repository if possible
+    update_repository
     
     # Install configuration files
     install_configs
@@ -235,11 +200,9 @@ main() {
     log_info "- Modular shell configuration system"
     log_info "- Easy configuration reloading with 'reload-configs'"
     echo
-    
-    if [[ -d "$BACKUP_DIR" ]]; then
-        log_info "Your previous configuration was backed up to:"
-        log_info "$BACKUP_DIR"
-    fi
+    log_info "To update in the future, simply run:"
+    log_info "  ${SCRIPT_DIR}/install.sh"
+    echo
 }
 
 # Run main function
