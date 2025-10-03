@@ -3,7 +3,7 @@
 set -e
 
 # Configuration
-REPO_URL="https://raw.githubusercontent.com/educobuci/config/main"
+REPO_URL="https://raw.githubusercontent.com/eduardocobuci-doordash/config/main"
 CONFIG_DIR="${HOME}/.config/shell"
 BACKUP_DIR="${HOME}/.config/shell.backup.$(date +%Y%m%d_%H%M%S)"
 
