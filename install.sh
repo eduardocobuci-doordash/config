@@ -62,23 +62,45 @@ backup_existing_config() {
     fi
 }
 
+# Get list of conf files from GitHub
+get_conf_files() {
+    local api_url="https://api.github.com/repos/eduardocobuci-doordash/config/contents/shell"
+    local response
+    
+    if command_exists curl; then
+        response=$(curl -fsSL "$api_url" 2>/dev/null)
+    elif command_exists wget; then
+        response=$(wget -qO- "$api_url" 2>/dev/null)
+    else
+        log_error "Neither curl nor wget is available."
+        exit 1
+    fi
+    
+    # Extract .conf filenames from JSON response
+    # This works with both bash and zsh
+    echo "$response" | grep -o '"name": *"[^"]*\.conf"' | sed 's/"name": *"\([^"]*\)"/\1/'
+}
+
 # Install configuration files
 install_configs() {
     log_info "Creating configuration directory: $CONFIG_DIR"
     mkdir -p "$CONFIG_DIR"
     
-    # List of files to download
-    local files=(
-        "shell/root.conf"
-        "shell/00-env.conf" 
-        "shell/01-git.conf"
-    )
+    log_info "Fetching list of configuration files from GitHub..."
+    local conf_files
+    conf_files=$(get_conf_files)
+    
+    if [[ -z "$conf_files" ]]; then
+        log_error "No configuration files found or failed to fetch file list"
+        exit 1
+    fi
     
     log_info "Downloading configuration files..."
-    for file in "${files[@]}"; do
-        local filename=$(basename "$file")
+    while IFS= read -r filename; do
+        [[ -z "$filename" ]] && continue
+        
         local dest="$CONFIG_DIR/$filename"
-        local url="$REPO_URL/$file"
+        local url="$REPO_URL/shell/$filename"
         
         log_info "Downloading $filename..."
         if download_file "$url" "$dest"; then
@@ -87,7 +109,7 @@ install_configs() {
             log_error "Failed to download $filename"
             exit 1
         fi
-    done
+    done <<< "$conf_files"
 }
 
 # Setup shell integration
