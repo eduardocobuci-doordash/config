@@ -18,6 +18,23 @@ chmod +x install.sh
 ./install.sh
 ```
 
+### Custom Repository or Branch
+
+You can install from a different repository or branch:
+
+```bash
+# Install from a forked repository
+curl -fsSL https://raw.githubusercontent.com/eduardocobuci-doordash/config/main/install.sh | bash -s -- --repo yourusername/your-config
+
+# Install from a specific branch
+curl -fsSL https://raw.githubusercontent.com/eduardocobuci-doordash/config/main/install.sh | bash -s -- --branch develop
+
+# Or download and use parameters
+curl -fsSL https://raw.githubusercontent.com/eduardocobuci-doordash/config/main/install.sh -o install.sh
+chmod +x install.sh
+./install.sh --repo yourusername/your-config --branch develop
+```
+
 ## What's Included
 
 - **Modular Configuration System**: Organized config files in `~/.config/shell/`
@@ -68,7 +85,8 @@ If you prefer to install manually:
 ~/.config/shell/
 ├── root.conf       # Main loader (sources all other configs)
 ├── 00-env.conf     # Environment and prompt settings
-└── 01-git.conf     # Git aliases and configurations
+├── 01-git.conf     # Git aliases and configurations
+└── 02-dd.conf      # DoorDash-specific configurations
 ```
 
 ## Uninstallation

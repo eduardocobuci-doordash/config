@@ -2,8 +2,48 @@
 
 set -e
 
+# Default configuration
+DEFAULT_REPO="eduardocobuci-doordash/config"
+DEFAULT_BRANCH="main"
+
+# Parse command line arguments
+REPO="${DEFAULT_REPO}"
+BRANCH="${DEFAULT_BRANCH}"
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --repo)
+            REPO="$2"
+            shift 2
+            ;;
+        --branch)
+            BRANCH="$2"
+            shift 2
+            ;;
+        --help|-h)
+            echo "Usage: $0 [OPTIONS]"
+            echo ""
+            echo "Options:"
+            echo "  --repo OWNER/REPO    GitHub repository (default: ${DEFAULT_REPO})"
+            echo "  --branch BRANCH      Git branch (default: ${DEFAULT_BRANCH})"
+            echo "  --help, -h           Show this help message"
+            echo ""
+            echo "Examples:"
+            echo "  $0"
+            echo "  $0 --repo myuser/my-config"
+            echo "  $0 --repo myuser/my-config --branch develop"
+            exit 0
+            ;;
+        *)
+            echo "ERROR: Unknown option: $1" >&2
+            echo "Use --help for usage information"
+            exit 1
+            ;;
+    esac
+done
+
 # Configuration
-REPO_URL="https://raw.githubusercontent.com/eduardocobuci-doordash/config/main"
+REPO_URL="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
 CONFIG_DIR="${HOME}/.config/shell"
 BACKUP_DIR="${HOME}/.config/shell.backup.$(date +%Y%m%d_%H%M%S)"
 
@@ -51,7 +91,7 @@ download_file() {
     fi
 }
 
-# Create backup if config directory exists
+# Create backup if config directory exists and remove old config
 backup_existing_config() {
     if [[ -d "$CONFIG_DIR" ]]; then
         log_warning "Existing configuration found at $CONFIG_DIR"
@@ -59,12 +99,16 @@ backup_existing_config() {
         mkdir -p "$(dirname "$BACKUP_DIR")"
         cp -r "$CONFIG_DIR" "$BACKUP_DIR"
         log_success "Backup created successfully"
+        
+        log_info "Removing old configuration directory for clean install..."
+        rm -rf "$CONFIG_DIR"
+        log_success "Old configuration removed"
     fi
 }
 
 # Get list of conf files from GitHub
 get_conf_files() {
-    local api_url="https://api.github.com/repos/eduardocobuci-doordash/config/contents/shell"
+    local api_url="https://api.github.com/repos/${REPO}/contents/shell?ref=${BRANCH}"
     local response
     
     if command_exists curl; then
