@@ -48,7 +48,7 @@ If you prefer to install manually:
 
 1. Clone this repository:
    ```bash
-   git clone https://github.com/educobuci/config.git
+   git clone https://github.com/eduardocobuci-doordash/config.git
    cd config
    ```
 
